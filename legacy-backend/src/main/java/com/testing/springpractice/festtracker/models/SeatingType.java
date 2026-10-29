@@ -1,4 +1,4 @@
-package com.testing.springpractice.festtracker.Models;
+package com.testing.springpractice.festtracker.models;
 
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
@@ -8,7 +8,6 @@ import lombok.NoArgsConstructor;
 
 import java.math.BigDecimal;
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.List;
 import java.util.UUID;
 

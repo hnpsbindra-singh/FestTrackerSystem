@@ -1,4 +1,4 @@
-package com.testing.springpractice.festtracker.Configurations;
+package com.testing.springpractice.festtracker.configurations;
 
 import com.cloudinary.Cloudinary;
 import com.cloudinary.utils.ObjectUtils;

@@ -1,9 +1,10 @@
-package com.testing.springpractice.festtracker.Controller;
+package com.testing.springpractice.festtracker.controller;
 
-import com.testing.springpractice.festtracker.Configurations.VerifiedUser;
-import com.testing.springpractice.festtracker.DataTranseferObjects.OrganiserDataTransferObjects.SeatingDetails;
-import com.testing.springpractice.festtracker.DataTranseferObjects.UserDataTransferObjects.*;
-import com.testing.springpractice.festtracker.Service.UserService;
+import com.testing.springpractice.festtracker.configurations.VerifiedUser;
+import com.testing.springpractice.festtracker.dataTranseferObjects.OrganiserDataTransferObjects.SeatingDetails;
+import com.testing.springpractice.festtracker.dataTranseferObjects.UserDataTransferObjects.*;
+import com.testing.springpractice.festtracker.service.UserService;
+import com.testing.springpractice.festtracker.serviceImpl.UserServiceImpl;
 import jakarta.validation.Valid;
 import org.springframework.data.domain.Page;
 import org.springframework.web.bind.annotation.*;
@@ -18,7 +19,7 @@ public class UserController {
 
     private final UserService userService;
 
-    public UserController(UserService userService) {
+    public UserController(UserServiceImpl userService) {
         this.userService = userService;
     }
 

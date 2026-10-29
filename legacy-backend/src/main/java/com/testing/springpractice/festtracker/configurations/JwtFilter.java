@@ -1,7 +1,8 @@
-package com.testing.springpractice.festtracker.Configurations;
+package com.testing.springpractice.festtracker.configurations;
 
-import com.testing.springpractice.festtracker.Repository.UserRepository;
+import com.testing.springpractice.festtracker.repository.UserRepository;
 import io.jsonwebtoken.Claims;
+import io.jsonwebtoken.JwtException;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -36,6 +37,7 @@ public class JwtFilter extends OncePerRequestFilter {
             jwt = token.substring(7);
         }
         if (jwt!=null&&SecurityContextHolder.getContext().getAuthentication()==null){
+            try {
                 Claims claims = jwtUtils.generateDetails(jwt);
                 UserDetails details = userRepository.findByUsername(claims.getSubject());
                 if (!jwtUtils.isExpired(jwt)&&details!=null){
@@ -43,6 +45,8 @@ public class JwtFilter extends OncePerRequestFilter {
                             claims.getSubject(), jwt, details.getAuthorities()
                     ));
                 }
+            } catch (JwtException | IllegalArgumentException e) {
+            }
         }
         filterChain.doFilter(request,response);
     }

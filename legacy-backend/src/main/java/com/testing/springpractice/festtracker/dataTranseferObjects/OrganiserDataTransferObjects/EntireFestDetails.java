@@ -1,6 +1,5 @@
-package com.testing.springpractice.festtracker.DataTranseferObjects.OrganiserDataTransferObjects;
+package com.testing.springpractice.festtracker.dataTranseferObjects.OrganiserDataTransferObjects;
 
-import jakarta.validation.constraints.NotBlank;
 import lombok.*;
 
 import java.time.LocalDate;
@@ -27,5 +26,6 @@ public class EntireFestDetails {
     private String ifscCode;
     private String accountHolderName;
     private String paymentQrURL;
+    private String posterUrl;
 
 }

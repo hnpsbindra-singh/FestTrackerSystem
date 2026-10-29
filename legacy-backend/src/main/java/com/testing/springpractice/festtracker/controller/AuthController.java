@@ -1,10 +1,11 @@
-package com.testing.springpractice.festtracker.Controller;
+package com.testing.springpractice.festtracker.controller;
 
-import com.testing.springpractice.festtracker.DataTranseferObjects.AuthDataTransferObjects.LoginRequest;
-import com.testing.springpractice.festtracker.DataTranseferObjects.AuthDataTransferObjects.RegisterRequest;
-import com.testing.springpractice.festtracker.DataTranseferObjects.AuthDataTransferObjects.ResetPasswordRequest;
-import com.testing.springpractice.festtracker.DataTranseferObjects.AuthDataTransferObjects.VerifyEmailRequest;
-import com.testing.springpractice.festtracker.Service.AuthService;
+import com.testing.springpractice.festtracker.dataTranseferObjects.AuthDataTransferObjects.LoginRequest;
+import com.testing.springpractice.festtracker.dataTranseferObjects.AuthDataTransferObjects.RegisterRequest;
+import com.testing.springpractice.festtracker.dataTranseferObjects.AuthDataTransferObjects.ResetPasswordRequest;
+import com.testing.springpractice.festtracker.dataTranseferObjects.AuthDataTransferObjects.VerifyEmailRequest;
+import com.testing.springpractice.festtracker.service.AuthService;
+import com.testing.springpractice.festtracker.serviceImpl.AuthServiceImpl;
 import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.*;
 
@@ -13,7 +14,7 @@ import org.springframework.web.bind.annotation.*;
 public class AuthController {
     private final AuthService authService;
 
-    public AuthController(AuthService authService) {
+    public AuthController(AuthServiceImpl authService) {
         this.authService = authService;
     }
 

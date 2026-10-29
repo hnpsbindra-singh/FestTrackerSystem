@@ -1,11 +1,11 @@
-package com.testing.springpractice.festtracker.Repository;
+package com.testing.springpractice.festtracker.repository;
 
-import com.testing.springpractice.festtracker.DataTranseferObjects.EmailDataTransferObjects.Receiver;
-import com.testing.springpractice.festtracker.DataTranseferObjects.OrganiserDataTransferObjects.EntireFestDetails;
-import com.testing.springpractice.festtracker.DataTranseferObjects.OrganiserDataTransferObjects.FestDetails;
-import com.testing.springpractice.festtracker.DataTranseferObjects.UserDataTransferObjects.FestInformation;
-import com.testing.springpractice.festtracker.DataTranseferObjects.UserDataTransferObjects.FestInformationBrief;
-import com.testing.springpractice.festtracker.Models.Fest;
+import com.testing.springpractice.festtracker.dataTranseferObjects.EmailDataTransferObjects.Receiver;
+import com.testing.springpractice.festtracker.dataTranseferObjects.OrganiserDataTransferObjects.EntireFestDetails;
+import com.testing.springpractice.festtracker.dataTranseferObjects.OrganiserDataTransferObjects.FestDetails;
+import com.testing.springpractice.festtracker.dataTranseferObjects.UserDataTransferObjects.FestInformation;
+import com.testing.springpractice.festtracker.dataTranseferObjects.UserDataTransferObjects.FestInformationBrief;
+import com.testing.springpractice.festtracker.models.Fest;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -15,20 +15,21 @@ import java.util.List;
 import java.util.UUID;
 
 public interface FestRepository extends JpaRepository<Fest, UUID> {
-    @Query("SELECT new com.testing.springpractice.festtracker.DataTranseferObjects.OrganiserDataTransferObjects.FestDetails( " +
+    @Query("SELECT new com.testing.springpractice.festtracker.dataTranseferObjects.OrganiserDataTransferObjects.FestDetails( " +
             "f.id, " +
             "f.title, " +
             "f.description, " +
             "f.date, " +
             "f.time, " +
-            "f.detailedAddress) from Fest f where f.organiser.username = :username")
+            "f.detailedAddress, " +
+            "f.posterUrl) from Fest f where f.organiser.username = :username")
     List<FestDetails> getFestDetailsByUsername(String username);
 
     @Query("select count(*) from Fest f where f.id = :eventId" +
             " AND f.organiser.username= :username")
     int isOwnerOfTheFest(UUID eventId, String username);
 
-    @Query("select new com.testing.springpractice.festtracker.DataTranseferObjects.OrganiserDataTransferObjects.EntireFestDetails(" +
+    @Query("select new com.testing.springpractice.festtracker.dataTranseferObjects.OrganiserDataTransferObjects.EntireFestDetails(" +
             " f.id," +
             "f.title," +
             "f.description," +
@@ -42,10 +43,11 @@ public interface FestRepository extends JpaRepository<Fest, UUID> {
             "f.bankAccountNumber," +
             "f.ifscCode," +
             "f.accountHolderName," +
-            "f.paymentQrURL) from Fest f where f.id = :eventId")
+            "f.paymentQrURL," +
+            "f.posterUrl) from Fest f where f.id = :eventId")
     EntireFestDetails entireFestDetails(UUID eventId);
 
-    @Query("select new com.testing.springpractice.festtracker.DataTranseferObjects.EmailDataTransferObjects.Receiver( b.user.username )" +
+    @Query("select new com.testing.springpractice.festtracker.dataTranseferObjects.EmailDataTransferObjects.Receiver( b.user.username )" +
             "from Fest f " +
             "Inner Join Bookings b on f.id = b.fest.id where f.id = :eventId")
     List<Receiver> getUsernameOfUsers(UUID eventId);
@@ -60,7 +62,8 @@ public interface FestRepository extends JpaRepository<Fest, UUID> {
             f.time AS time,
             f.detailed_address AS detailedAddress,
             f.genre AS genre,
-            f.language AS language
+            f.language AS language,
+            f.poster_url AS posterUrl
         FROM fest f
         WHERE f.active = true
           AND f.date >= CURRENT_DATE
@@ -109,7 +112,7 @@ public interface FestRepository extends JpaRepository<Fest, UUID> {
             Pageable pageable
     );
 
-    @Query("select new com.testing.springpractice.festtracker.DataTranseferObjects.UserDataTransferObjects.FestInformationBrief(" +
+    @Query("select new com.testing.springpractice.festtracker.dataTranseferObjects.UserDataTransferObjects.FestInformationBrief(" +
             "f.id," +
             "f.organiser.name," +
             "f.title," +
@@ -121,6 +124,7 @@ public interface FestRepository extends JpaRepository<Fest, UUID> {
             "f.ageLimit," +
             "f.language," +
             "f.genre," +
-            "f.active) from Fest f where f.id = :eventId")
+            "f.active," +
+            "f.posterUrl) from Fest f where f.id = :eventId")
     FestInformationBrief getEventDetails(UUID eventId);
 }

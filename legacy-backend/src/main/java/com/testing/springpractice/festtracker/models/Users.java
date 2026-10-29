@@ -1,4 +1,4 @@
-package com.testing.springpractice.festtracker.Models;
+package com.testing.springpractice.festtracker.models;
 
 
 import jakarta.persistence.*;

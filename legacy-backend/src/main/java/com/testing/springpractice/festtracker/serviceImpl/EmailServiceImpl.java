@@ -1,31 +1,43 @@
-package com.testing.springpractice.festtracker.Service;
-import com.testing.springpractice.festtracker.DataTranseferObjects.EmailDataTransferObjects.EmailRequest;
-import com.testing.springpractice.festtracker.DataTranseferObjects.EmailDataTransferObjects.Receiver;
-import com.testing.springpractice.festtracker.DataTranseferObjects.EmailDataTransferObjects.Sender;
+package com.testing.springpractice.festtracker.serviceImpl;
+import com.testing.springpractice.festtracker.dataTranseferObjects.EmailDataTransferObjects.EmailRequest;
+import com.testing.springpractice.festtracker.dataTranseferObjects.EmailDataTransferObjects.Receiver;
+import com.testing.springpractice.festtracker.dataTranseferObjects.EmailDataTransferObjects.Sender;
+import com.testing.springpractice.festtracker.dataTranseferObjects.KafkaDataTransferObjects.DeclineTicketMessageDTO;
+import com.testing.springpractice.festtracker.dataTranseferObjects.KafkaDataTransferObjects.OtpKafkaDTO;
+import com.testing.springpractice.festtracker.dataTranseferObjects.KafkaDataTransferObjects.SendBookingDTO;
+import com.testing.springpractice.festtracker.dataTranseferObjects.KafkaDataTransferObjects.SendFestCancellationMailDTO;
+import com.testing.springpractice.festtracker.service.MessagingService;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.*;
+import org.springframework.kafka.annotation.KafkaListener;
+import org.springframework.kafka.annotation.RetryableTopic;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.util.List;
 
 @Service
-public class EmailService {
+public class EmailServiceImpl implements MessagingService {
     private final RestTemplate restTemplate;
-    @Value("${brevo.api.key}")
+    @Value("${brevo.api-key}")
     private String apiKey;
 
-    @Value("${brevo.sender.email}")
+    @Value("${brevo.sender-email}")
     private String senderEmail;
 
-    @Value("${brevo.sender.name}")
+    @Value("${brevo.sender-name}")
     private String senderName;
 
-    public EmailService(RestTemplate restTemplate) {
+    public EmailServiceImpl(RestTemplate restTemplate) {
         this.restTemplate = restTemplate;
     }
 
-    public void sendOtp(String username, String name, String otp) {
+    @KafkaListener(
+            topics = "otp-Service",
+            groupId = "Email-Service"
+    )
+    public void sendOtp(OtpKafkaDTO otpKafkaDTO) {
         String subject = "Verify Your Email";
 
        String html = """
@@ -117,13 +129,13 @@ public class EmailService {
 
         </body>
         </html>
-        """.formatted(name, otp);
+        """.formatted(otpKafkaDTO.name(), otpKafkaDTO.otp());
         Sender sender = Sender.builder()
                 .name(senderName)
                 .email(senderEmail)
                 .build();
         Receiver receiver = Receiver.builder()
-                .email(username)
+                .email(otpKafkaDTO.username())
                 .build();
         EmailRequest request = EmailRequest.builder()
                 .sender(sender)
@@ -144,11 +156,15 @@ public class EmailService {
             );
             System.out.println("Email sent successfully");
         } catch (Exception e) {
-            throw new RuntimeException("Failed to send email: " + e.getMessage());
+            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Failed to send email: " + e.getMessage(), e);
         }
     }
 
-    public void sendDeclineMessage(String username, String name, String title) {
+    @KafkaListener(
+            topics = "Decline-Ticket-Service",
+            groupId = "Email-Service"
+    )
+    public void sendDeclineMessage(DeclineTicketMessageDTO request) {
         String subject = "Booking Declined";
 
         String html = """
@@ -156,15 +172,15 @@ public class EmailService {
                 <p>Your payment for %s has been declined</p>
                 <p>any amount deducted will be soon refunded</p>
                 <p>Team %s</p>
-                """.formatted(name, title, title);
+                """.formatted(request.name(), request.title(), request.title());
         Sender sender = Sender.builder()
                 .name(senderName)
                 .email(senderEmail)
                 .build();
         Receiver receiver = Receiver.builder()
-                .email(username)
+                .email(request.username())
                 .build();
-        EmailRequest request = EmailRequest.builder()
+        EmailRequest emailRequest= EmailRequest.builder()
                 .sender(sender)
                 .to(List.of(receiver))
                 .subject(subject)
@@ -173,7 +189,7 @@ public class EmailService {
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);
         headers.set("api-key", apiKey);
-        HttpEntity<EmailRequest> entity = new HttpEntity<>(request, headers);
+        HttpEntity<EmailRequest> entity = new HttpEntity<>(emailRequest, headers);
         try {
             ResponseEntity<String> response = restTemplate.exchange(
                     "https://api.brevo.com/v3/smtp/email",
@@ -183,11 +199,15 @@ public class EmailService {
             );
             System.out.println("Email sent successfully");
         } catch (Exception e) {
-            throw new RuntimeException("Failed to send OTP email: " + e.getMessage());
+            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Failed to send OTP email: " + e.getMessage(), e);
         }
     }
 
-    public void sendFestCancellationMail(List<Receiver> email, String title) {
+    @KafkaListener(
+            topics = "Decline-Event-Service",
+            groupId = "Email-Service"
+    )
+    public void sendFestCancellationMail(SendFestCancellationMailDTO request) {
         String subject = "Booking Declined";
 
         String html = """
@@ -195,21 +215,21 @@ public class EmailService {
                 <p>Fest titled %s has been cancelled due to unavoidable reasons</p>
                 <p>any amount deducted will be soon refunded</p>
                 <p>Team %s</p>
-                """.formatted(title, title);
+                """.formatted(request.title(), request.title());
         Sender sender = Sender.builder()
                 .name(senderName)
                 .email(senderEmail)
                 .build();
-        EmailRequest request = EmailRequest.builder()
+        EmailRequest emailRequest = EmailRequest.builder()
                 .sender(sender)
-                .to(email)
+                .to(request.mail())
                 .subject(subject)
                 .htmlContent(html)
                 .build();
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);
         headers.set("api-key", apiKey);
-        HttpEntity<EmailRequest> entity = new HttpEntity<>(request, headers);
+        HttpEntity<EmailRequest> entity = new HttpEntity<>(emailRequest, headers);
         try {
             ResponseEntity<String> response = restTemplate.exchange(
                     "https://api.brevo.com/v3/smtp/email",
@@ -219,11 +239,15 @@ public class EmailService {
             );
             System.out.println("Email sent successfully");
         } catch (Exception e) {
-            throw new RuntimeException("Failed to send email: " + e.getMessage());
+            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Failed to send email: " + e.getMessage(), e);
         }
     }
 
-    public void sendBooking(String username, String name, String s) {
+    @KafkaListener(
+            topics = "send-Booking-Service",
+            groupId = "Email-Service"
+    )
+    public void sendBooking(SendBookingDTO request) {
         String subject = "Booking Success!!!";
 
         String html = """
@@ -232,15 +256,15 @@ public class EmailService {
                 <p>Any change of plans will be informed</p>
                 <p>Your booking Key is</p>
                 <h2>%s</h2>
-                """.formatted(name, s);
+                """.formatted(request.name(), request.s());
         Sender sender = Sender.builder()
                 .name(senderName)
                 .email(senderEmail)
                 .build();
         Receiver receiver = Receiver.builder()
-                .email(username)
+                .email(request.username())
                 .build();
-        EmailRequest request = EmailRequest.builder()
+        EmailRequest emailRequest = EmailRequest.builder()
                 .sender(sender)
                 .to(List.of(receiver))
                 .subject(subject)
@@ -249,7 +273,7 @@ public class EmailService {
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);
         headers.set("api-key", apiKey);
-        HttpEntity<EmailRequest> entity = new HttpEntity<>(request, headers);
+        HttpEntity<EmailRequest> entity = new HttpEntity<>(emailRequest, headers);
         try {
             ResponseEntity<String> response = restTemplate.exchange(
                     "https://api.brevo.com/v3/smtp/email",
@@ -259,7 +283,7 @@ public class EmailService {
             );
             System.out.println("Email sent successfully");
         } catch (Exception e) {
-            throw new RuntimeException("Failed to send email: " + e.getMessage());
+            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Failed to send email: " + e.getMessage(), e);
         }
     }
 }

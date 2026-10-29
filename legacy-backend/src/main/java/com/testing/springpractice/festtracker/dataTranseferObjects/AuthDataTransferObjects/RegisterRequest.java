@@ -1,7 +1,7 @@
-package com.testing.springpractice.festtracker.DataTranseferObjects.AuthDataTransferObjects;
+package com.testing.springpractice.festtracker.dataTranseferObjects.AuthDataTransferObjects;
 
 
-import com.testing.springpractice.festtracker.Models.Role;
+import com.testing.springpractice.festtracker.models.Role;
 import jakarta.validation.constraints.*;
 import lombok.*;
 

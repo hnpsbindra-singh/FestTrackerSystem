@@ -1,4 +1,4 @@
-package com.testing.springpractice.festtracker.Models;
+package com.testing.springpractice.festtracker.models;
 
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
@@ -61,5 +61,6 @@ public class Fest {
     private String accountHolderName;
     @Column(nullable = false)
     private String paymentQrURL;
+    private String posterUrl;
 
 }

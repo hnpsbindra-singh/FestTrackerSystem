@@ -1,4 +1,4 @@
-package com.testing.springpractice.festtracker.DataTranseferObjects.UserDataTransferObjects;
+package com.testing.springpractice.festtracker.dataTranseferObjects.UserDataTransferObjects;
 import jakarta.validation.constraints.NotBlank;
 import lombok.*;
 

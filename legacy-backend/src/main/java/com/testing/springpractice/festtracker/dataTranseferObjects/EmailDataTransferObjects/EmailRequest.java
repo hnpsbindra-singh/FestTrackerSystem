@@ -1,4 +1,4 @@
-package com.testing.springpractice.festtracker.DataTranseferObjects.EmailDataTransferObjects;
+package com.testing.springpractice.festtracker.dataTranseferObjects.EmailDataTransferObjects;
 
 import lombok.*;
 

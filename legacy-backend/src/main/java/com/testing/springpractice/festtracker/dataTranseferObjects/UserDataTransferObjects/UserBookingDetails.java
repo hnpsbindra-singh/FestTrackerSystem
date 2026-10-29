@@ -1,6 +1,6 @@
-package com.testing.springpractice.festtracker.DataTranseferObjects.UserDataTransferObjects;
+package com.testing.springpractice.festtracker.dataTranseferObjects.UserDataTransferObjects;
 
-import com.testing.springpractice.festtracker.Models.PaymentStatus;
+import com.testing.springpractice.festtracker.models.PaymentStatus;
 import lombok.*;
 
 import java.time.LocalDate;

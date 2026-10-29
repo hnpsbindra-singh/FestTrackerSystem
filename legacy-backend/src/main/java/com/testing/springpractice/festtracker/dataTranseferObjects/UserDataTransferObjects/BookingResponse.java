@@ -1,4 +1,4 @@
-package com.testing.springpractice.festtracker.DataTranseferObjects.UserDataTransferObjects;
+package com.testing.springpractice.festtracker.dataTranseferObjects.UserDataTransferObjects;
 
 import lombok.*;
 import java.util.UUID;

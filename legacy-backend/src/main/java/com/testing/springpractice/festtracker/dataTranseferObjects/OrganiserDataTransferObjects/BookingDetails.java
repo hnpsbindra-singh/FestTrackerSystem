@@ -1,4 +1,4 @@
-package com.testing.springpractice.festtracker.DataTranseferObjects.OrganiserDataTransferObjects;
+package com.testing.springpractice.festtracker.dataTranseferObjects.OrganiserDataTransferObjects;
 
 import lombok.*;
 

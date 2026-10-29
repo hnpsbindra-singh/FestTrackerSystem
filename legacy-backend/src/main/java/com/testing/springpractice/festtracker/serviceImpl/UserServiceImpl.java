@@ -1,40 +1,49 @@
-package com.testing.springpractice.festtracker.Service;
+package com.testing.springpractice.festtracker.serviceImpl;
 
-import com.testing.springpractice.festtracker.Configurations.ProjectUtils;
-import com.testing.springpractice.festtracker.DataTranseferObjects.OrganiserDataTransferObjects.SeatingDetails;
-import com.testing.springpractice.festtracker.DataTranseferObjects.UserDataTransferObjects.*;
-import com.testing.springpractice.festtracker.Models.Bookings;
-import com.testing.springpractice.festtracker.Models.Fest;
-import com.testing.springpractice.festtracker.Models.PaymentStatus;
-import com.testing.springpractice.festtracker.Models.SeatingType;
-import com.testing.springpractice.festtracker.Repository.BookingRepository;
-import com.testing.springpractice.festtracker.Repository.FestRepository;
-import com.testing.springpractice.festtracker.Repository.SeatingRepository;
+import com.testing.springpractice.festtracker.configurations.ProjectUtils;
+import com.testing.springpractice.festtracker.dataTranseferObjects.KafkaDataTransferObjects.SendBookingDTO;
+import com.testing.springpractice.festtracker.dataTranseferObjects.OrganiserDataTransferObjects.SeatingDetails;
+import com.testing.springpractice.festtracker.dataTranseferObjects.UserDataTransferObjects.*;
+import com.testing.springpractice.festtracker.models.Bookings;
+import com.testing.springpractice.festtracker.models.Fest;
+import com.testing.springpractice.festtracker.models.PaymentStatus;
+import com.testing.springpractice.festtracker.models.SeatingType;
+import com.testing.springpractice.festtracker.models.Users;
+import com.testing.springpractice.festtracker.repository.BookingRepository;
+import com.testing.springpractice.festtracker.repository.FestRepository;
+import com.testing.springpractice.festtracker.repository.SeatingRepository;
+import com.testing.springpractice.festtracker.service.MessagingService;
+import com.testing.springpractice.festtracker.service.UserService;
 import jakarta.validation.Valid;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.http.HttpStatus;
+import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.UUID;
 
 @Service
-public class UserService {
+public class UserServiceImpl implements UserService {
     private final FestRepository festRepository;
     private final SeatingRepository seatingRepository;
     private final ProjectUtils projectUtils;
     private final BookingRepository bookingRepository;
-    private final EmailService emailService;
+    private final MessagingService emailService;
+    private final KafkaTemplate<String, Object> kafka;
 
-    public UserService(FestRepository festRepository, SeatingRepository seatingRepository, ProjectUtils projectUtils, BookingRepository bookingRepository, EmailService emailService) {
+    public UserServiceImpl(FestRepository festRepository, SeatingRepository seatingRepository, ProjectUtils projectUtils, BookingRepository bookingRepository, MessagingService emailService, KafkaTemplate<String, Object> kafka) {
         this.festRepository = festRepository;
         this.seatingRepository = seatingRepository;
         this.projectUtils = projectUtils;
         this.bookingRepository = bookingRepository;
         this.emailService = emailService;
+        this.kafka = kafka;
     }
 
     public Page<FestInformation> findEvents(Double latitude, Double longitude, int page, int size, int radius) {
@@ -45,14 +54,14 @@ public class UserService {
     @Transactional
     public BookingResponse initiateBooking(@Valid BookingInitiateRequest request) {
         Fest fest = festRepository.findById(request.getFestId()).orElseThrow(
-                ()->new RuntimeException("Fest Doesn't exist")
+                ()->new ResponseStatusException(HttpStatus.NOT_FOUND, "Fest Not Found")
         );
         SeatingType seatingType = seatingRepository.findById(request.getSeatingTypeId()).orElseThrow(
-                ()-> new RuntimeException("Invalid Seating type")
+                ()-> new ResponseStatusException(HttpStatus.NOT_FOUND, "Seating Not Foundx")
         );
 
         if (seatingType.getAvailableSeats() < request.getSlots()) {
-            throw new RuntimeException("Not enough seats available");
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Not Enough Seats available");
         }
 
         Long totalCost = seatingType.getPrice().multiply(BigDecimal.valueOf(request.getSlots())).longValue();
@@ -79,30 +88,35 @@ public class UserService {
     @Transactional
     public String confirmBooking(UUID bookingId, @Valid PaymentConfirmRequest request) {
         Bookings booking = bookingRepository.findById(bookingId)
-                .orElseThrow(() -> new RuntimeException("Booking not found"));
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Booking Not Found"));
+
+        Users currentUser = projectUtils.getCurrent();
+        if (currentUser == null || !booking.getUser().getId().equals(currentUser.getId())) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Access denied: You do not own this booking");
+        }
+
         if (booking.getPaymentStatus() != PaymentStatus.PAYMENT_PENDING) {
-            throw new RuntimeException("Booking is not in pending state");
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Booking is not in pending state");
         }
         int rowsUpdated = seatingRepository.deductSeatsAtomic(
                 booking.getSeatingType().getId(),
                 booking.getSlots().intValue()
         );
         if (rowsUpdated == 1) {
-            booking.setBookingKey(projectUtils.bookingKey());
+            booking.setBookingKey(projectUtils.generateUniqueBookingKey());
             booking.setTransactionId(request.getTransactionId());
             booking.setPaymentStatus(PaymentStatus.PAYMENT_SUBMITTED);
 
             bookingRepository.save(booking);
-            emailService.sendBooking(
-                    booking.getUser().getUsername(),
+            SendBookingDTO dto = new SendBookingDTO( booking.getUser().getUsername(),
                     booking.getUser().getName(),
-                    booking.getBookingKey()
-            );
+                    booking.getBookingKey());
+            kafka.send("send-Booking-Service", dto.username(), dto);
             return "Booking Submitted Successfully! Booking Key: " + booking.getBookingKey();
         } else {
             booking.setPaymentStatus(PaymentStatus.PAYMENT_REJECTED);
             bookingRepository.save(booking);
-            throw new RuntimeException("Sold out: Seats became unavailable during checkout.");
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Seats occupied before payment");
         }
     }
 

@@ -1,6 +1,6 @@
-package com.testing.springpractice.festtracker.Configurations;
+package com.testing.springpractice.festtracker.configurations;
 
-import com.testing.springpractice.festtracker.Models.Role;
+import com.testing.springpractice.festtracker.models.Role;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.SignatureAlgorithm;
@@ -20,19 +20,19 @@ public class JwtUtils {
     private Long expiration;
     public String generateToken(String username, Role role){
         return Jwts.builder()
-                .setSubject(username)
-                .setIssuedAt(new Date())
-                .setExpiration(new Date(System.currentTimeMillis()+expiration))
-                .addClaims(Map.of("role", role.name()))
-                .signWith(getSignedKey(), SignatureAlgorithm.HS256)
+                .subject(username)
+                .issuedAt(new Date())
+                .expiration(new Date(System.currentTimeMillis()+expiration))
+                .claim("role", role.name())
+                .signWith(getSignedKey())
                 .compact();
     }
     private Key getSignedKey(){
         return Keys.hmacShaKeyFor(secret.getBytes());
     }
     public Claims generateDetails(String token){
-       return Jwts.parser().
-                setSigningKey(getSignedKey())
+       return Jwts.parser()
+               .setSigningKey(getSignedKey())
                 .build()
                 .parseClaimsJws(token)
                 .getBody();

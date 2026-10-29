@@ -310,6 +310,7 @@ The backend APIs are documented using **Swagger / OpenAPI**, allowing endpoints 
 ### Backend
 
 ```bash
+cd legacy-backend
 mvn clean install
 mvn spring-boot:run
 ```

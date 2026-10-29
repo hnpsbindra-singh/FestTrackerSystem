@@ -1,8 +1,7 @@
-package com.testing.springpractice.festtracker.Repository;
+package com.testing.springpractice.festtracker.repository;
 
-import com.testing.springpractice.festtracker.DataTranseferObjects.OrganiserDataTransferObjects.BookingDetails;
-import com.testing.springpractice.festtracker.DataTranseferObjects.OrganiserDataTransferObjects.SeatingDetails;
-import com.testing.springpractice.festtracker.Models.SeatingType;
+import com.testing.springpractice.festtracker.dataTranseferObjects.OrganiserDataTransferObjects.SeatingDetails;
+import com.testing.springpractice.festtracker.models.SeatingType;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
@@ -12,7 +11,7 @@ import java.util.List;
 import java.util.UUID;
 
 public interface SeatingRepository extends JpaRepository<SeatingType, UUID> {
-    @Query("select new com.testing.springpractice.festtracker.DataTranseferObjects.OrganiserDataTransferObjects.SeatingDetails(" +
+    @Query("select new com.testing.springpractice.festtracker.dataTranseferObjects.OrganiserDataTransferObjects.SeatingDetails(" +
             "s.id, s.name, s.price, s.totalSeats, s.availableSeats) " +
             "from SeatingType s where s.fest.id = :eventId")
     List<SeatingDetails> getSeatingDetailsByFestId(UUID eventId);

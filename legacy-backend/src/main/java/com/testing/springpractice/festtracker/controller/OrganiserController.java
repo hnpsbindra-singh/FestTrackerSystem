@@ -1,12 +1,15 @@
-package com.testing.springpractice.festtracker.Controller;
+package com.testing.springpractice.festtracker.controller;
 
-import com.testing.springpractice.festtracker.Configurations.VerifiedUser;
-import com.testing.springpractice.festtracker.DataTranseferObjects.OrganiserDataTransferObjects.*;
-import com.testing.springpractice.festtracker.Service.OrganiserService;
+import com.testing.springpractice.festtracker.configurations.VerifiedUser;
+import com.testing.springpractice.festtracker.dataTranseferObjects.OrganiserDataTransferObjects.*;
+import com.testing.springpractice.festtracker.service.OrganiserService;
+import com.testing.springpractice.festtracker.serviceImpl.OrganiserServiceImpl;
 import jakarta.validation.Valid;
 import org.springframework.data.domain.Page;
+import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.io.IOException;
 import java.util.List;
@@ -19,17 +22,18 @@ public class OrganiserController {
 
     private final OrganiserService organiserService;
 
-    public OrganiserController(OrganiserService organiserService) {
+    public OrganiserController(OrganiserServiceImpl organiserService) {
         this.organiserService = organiserService;
     }
 
     @PostMapping("/addEvent")
     public String addEvent(    @Valid @RequestPart("fest") FestCreationRequest request,
-                               @RequestPart("paymentQr") MultipartFile paymentQr){
+                               @RequestPart("paymentQr") MultipartFile paymentQr,
+                               @RequestPart(value = "poster", required = false) MultipartFile poster){
         try {
-            return organiserService.addEvent(request, paymentQr);
+            return organiserService.addEvent(request, paymentQr, poster);
         } catch (IOException e) {
-            throw new RuntimeException(e);
+            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Failed to upload files", e);
         }
     }
     @GetMapping("/view-my-events")

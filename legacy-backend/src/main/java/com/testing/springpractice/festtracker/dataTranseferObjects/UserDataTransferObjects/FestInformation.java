@@ -1,4 +1,4 @@
-package com.testing.springpractice.festtracker.DataTranseferObjects.UserDataTransferObjects;
+package com.testing.springpractice.festtracker.dataTranseferObjects.UserDataTransferObjects;
 
 import java.time.LocalDate;
 import java.time.LocalTime;
@@ -13,4 +13,5 @@ public interface FestInformation {
     String getDetailedAddress();
     String getGenre();
     String getLanguage();
+    String getPosterUrl();
 }

@@ -1,10 +1,8 @@
-package com.testing.springpractice.festtracker.DataTranseferObjects.OrganiserDataTransferObjects;
+package com.testing.springpractice.festtracker.dataTranseferObjects.OrganiserDataTransferObjects;
 
-import jakarta.persistence.Column;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.*;
 import lombok.*;
-import org.springframework.web.multipart.MultipartFile;
 
 import java.time.LocalDate;
 import java.time.LocalTime;

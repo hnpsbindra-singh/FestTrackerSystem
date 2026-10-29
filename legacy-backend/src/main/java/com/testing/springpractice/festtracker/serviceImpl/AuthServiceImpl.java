@@ -1,47 +1,57 @@
-package com.testing.springpractice.festtracker.Service;
+package com.testing.springpractice.festtracker.serviceImpl;
 
-import com.testing.springpractice.festtracker.Configurations.JwtUtils;
-import com.testing.springpractice.festtracker.DataTranseferObjects.AuthDataTransferObjects.LoginRequest;
-import com.testing.springpractice.festtracker.DataTranseferObjects.AuthDataTransferObjects.RegisterRequest;
-import com.testing.springpractice.festtracker.DataTranseferObjects.AuthDataTransferObjects.ResetPasswordRequest;
-import com.testing.springpractice.festtracker.DataTranseferObjects.AuthDataTransferObjects.VerifyEmailRequest;
-import com.testing.springpractice.festtracker.Models.Users;
-import com.testing.springpractice.festtracker.Repository.UserRepository;
+import com.testing.springpractice.festtracker.configurations.JwtUtils;
+import com.testing.springpractice.festtracker.dataTranseferObjects.AuthDataTransferObjects.LoginRequest;
+import com.testing.springpractice.festtracker.dataTranseferObjects.AuthDataTransferObjects.RegisterRequest;
+import com.testing.springpractice.festtracker.dataTranseferObjects.AuthDataTransferObjects.ResetPasswordRequest;
+import com.testing.springpractice.festtracker.dataTranseferObjects.AuthDataTransferObjects.VerifyEmailRequest;
+import com.testing.springpractice.festtracker.dataTranseferObjects.KafkaDataTransferObjects.DeclineTicketMessageDTO;
+import com.testing.springpractice.festtracker.dataTranseferObjects.KafkaDataTransferObjects.OtpKafkaDTO;
+import com.testing.springpractice.festtracker.dataTranseferObjects.KafkaDataTransferObjects.SendBookingDTO;
+import com.testing.springpractice.festtracker.dataTranseferObjects.KafkaDataTransferObjects.SendFestCancellationMailDTO;
+import com.testing.springpractice.festtracker.models.Users;
+import com.testing.springpractice.festtracker.repository.UserRepository;
+import com.testing.springpractice.festtracker.service.AuthService;
+import com.testing.springpractice.festtracker.service.MessagingService;
 import jakarta.validation.Valid;
 import org.springframework.data.redis.core.RedisTemplate;
+import org.springframework.http.HttpStatus;
+import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+import org.springframework.web.server.ResponseStatusException;
 
+import java.security.SecureRandom;
 import java.util.concurrent.TimeUnit;
 
 @Service
-public class AuthService {
+public class AuthServiceImpl implements AuthService {
+    private static final SecureRandom SECURE_RANDOM = new SecureRandom();
     private final UserRepository userRepository;
     private final RedisTemplate<String, String> redisTemplate;
-    private final RedisTemplate<String, RegisterRequest> redisTemplateReq;
-    private final EmailService emailService;
+    private final RedisTemplate<String, Object> redisTemplateReq;
     private final PasswordEncoder passwordEncoder;
     private final AuthenticationManager authenticationManager;
     private final JwtUtils jwtUtils;
+    public final KafkaTemplate<String, OtpKafkaDTO> otpKafka;
 
-
-    public AuthService(UserRepository userRepository, RedisTemplate<String, String> redisTemplate, RedisTemplate<String, RegisterRequest> redisTemplateReq, EmailService emailService, PasswordEncoder passwordEncoder, AuthenticationManager authenticationManager, JwtUtils jwtUtils) {
+    public AuthServiceImpl(UserRepository userRepository, RedisTemplate<String, String> redisTemplate, RedisTemplate<String, Object> redisTemplateReq, MessagingService emailService, PasswordEncoder passwordEncoder, AuthenticationManager authenticationManager, JwtUtils jwtUtils, KafkaTemplate<String, OtpKafkaDTO> otpKafka, KafkaTemplate<String, DeclineTicketMessageDTO> declineKafka, KafkaTemplate<String, SendBookingDTO> bookingKafka, KafkaTemplate<String, SendFestCancellationMailDTO> festKafka) {
         this.userRepository = userRepository;
         this.redisTemplate = redisTemplate;
         this.redisTemplateReq = redisTemplateReq;
-        this.emailService = emailService;
         this.passwordEncoder = passwordEncoder;
         this.authenticationManager = authenticationManager;
         this.jwtUtils = jwtUtils;
+        this.otpKafka = otpKafka;
     }
 
     public String register(@Valid RegisterRequest request) {
         if(userRepository.existsByUsername(request.getUsername().toLowerCase().trim())){
-            throw new RuntimeException("User already exists");
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "User already exists");
         }
-        int oneTime = 100000 + (int)(Math.random() * 900000);
+        int oneTime = 100000 + SECURE_RANDOM.nextInt(900000);
         String otp = Integer.toString(oneTime);
         request.setUsername(request.getUsername().toLowerCase().trim());
         redisTemplate.opsForValue().set("user: "+request.getUsername(),
@@ -53,22 +63,23 @@ public class AuthService {
                 request,
                 5,
                 TimeUnit.MINUTES);
-        emailService.sendOtp(request.getUsername(), request.getName(), otp);
+        OtpKafkaDTO otpKafkaDTO = new OtpKafkaDTO(request.getUsername(), request.getName(), otp);
+        otpKafka.send("otp-Service", request.getUsername(), otpKafkaDTO);
         return "Otp Sent Successfully";
     }
 
     public String verify(@Valid VerifyEmailRequest verifyEmailRequest) {
-        RegisterRequest registerRequest = redisTemplateReq.opsForValue().get("userObject: " + verifyEmailRequest.getUsername().toLowerCase().trim());
+        RegisterRequest registerRequest = (RegisterRequest) redisTemplateReq.opsForValue().get("userObject: " + verifyEmailRequest.getUsername().toLowerCase().trim());
         String storedOtp = redisTemplate.opsForValue().get("user: "+verifyEmailRequest.getUsername().toLowerCase().trim());
         if (storedOtp == null) {
-            throw new RuntimeException("OTP expired.");
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "OTP expired.");
         }
 
         if (!storedOtp.equals(verifyEmailRequest.getOtp())) {
-            throw new RuntimeException("Invalid OTP.");
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid OTP.");
         }
         if (registerRequest == null) {
-            throw new RuntimeException("Registration expired.");
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Registration expired.");
         }
         Users user = Users.builder()
                 .role(registerRequest.getRole())
@@ -98,14 +109,15 @@ public class AuthService {
 
     public String sendOtp(String username) {
         username = username.toLowerCase().trim();
-        if (!userRepository.existsByUsername(username)) throw new RuntimeException("User Doesn't Exist");
-        int oneTime = 100000 + (int)(Math.random() * 900000);
+        if (!userRepository.existsByUsername(username)) throw new ResponseStatusException(HttpStatus.NOT_FOUND, "User Doesn't Exist");
+        int oneTime = 100000 + SECURE_RANDOM.nextInt(900000);
         String otp = Integer.toString(oneTime);
         redisTemplate.opsForValue().set("username:" + username
                 , otp,
                 5,
                 TimeUnit.MINUTES);
-        emailService.sendOtp(username, "user", otp);
+        OtpKafkaDTO otpKafkaDTO = new OtpKafkaDTO(username, new String("user"), otp);
+        otpKafka.send("otp-Service", username, otpKafkaDTO);
         return "Otp Sent Successfully";
     }
 
@@ -113,10 +125,10 @@ public class AuthService {
         String username = resetPasswordRequest.getUsername().toLowerCase().trim();
         String storedOtp = redisTemplate.opsForValue().get("username:" + username);
         if (storedOtp == null) {
-            throw new RuntimeException("OTP expired.");
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "OTP expired.");
         }
         if (!storedOtp.equals(resetPasswordRequest.getOtp())) {
-            throw new RuntimeException("Invalid OTP.");
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid OTP.");
         }
         int rowsAffected = userRepository.updatepasswordForusername(
                 passwordEncoder.encode(resetPasswordRequest.getNewPassword()),

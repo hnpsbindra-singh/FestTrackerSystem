@@ -1,4 +1,4 @@
-package com.testing.springpractice.festtracker.DataTranseferObjects.OrganiserDataTransferObjects;
+package com.testing.springpractice.festtracker.dataTranseferObjects.OrganiserDataTransferObjects;
 
 import lombok.*;
 
@@ -18,5 +18,6 @@ public class FestDetails {
     private LocalDate date;
     private LocalTime time;
     private String detailedAddress;
+    private String posterUrl;
 
 }

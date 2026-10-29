@@ -1,25 +1,33 @@
-package com.testing.springpractice.festtracker.Service;
+package com.testing.springpractice.festtracker.serviceImpl;
 
 import com.cloudinary.Cloudinary;
 import com.cloudinary.utils.ObjectUtils;
-import com.testing.springpractice.festtracker.Configurations.ProjectUtils;
-import com.testing.springpractice.festtracker.DataTranseferObjects.EmailDataTransferObjects.Receiver;
-import com.testing.springpractice.festtracker.DataTranseferObjects.OrganiserDataTransferObjects.*;
-import com.testing.springpractice.festtracker.Models.Bookings;
-import com.testing.springpractice.festtracker.Models.Fest;
-import com.testing.springpractice.festtracker.Models.PaymentStatus;
-import com.testing.springpractice.festtracker.Models.SeatingType;
-import com.testing.springpractice.festtracker.Repository.BookingRepository;
-import com.testing.springpractice.festtracker.Repository.FestRepository;
-import com.testing.springpractice.festtracker.Repository.SeatingRepository;
+import com.testing.springpractice.festtracker.configurations.ProjectUtils;
+import com.testing.springpractice.festtracker.dataTranseferObjects.EmailDataTransferObjects.Receiver;
+import com.testing.springpractice.festtracker.dataTranseferObjects.KafkaDataTransferObjects.DeclineTicketMessageDTO;
+import com.testing.springpractice.festtracker.dataTranseferObjects.KafkaDataTransferObjects.SendBookingDTO;
+import com.testing.springpractice.festtracker.dataTranseferObjects.KafkaDataTransferObjects.SendFestCancellationMailDTO;
+import com.testing.springpractice.festtracker.dataTranseferObjects.OrganiserDataTransferObjects.*;
+import com.testing.springpractice.festtracker.models.Bookings;
+import com.testing.springpractice.festtracker.models.Fest;
+import com.testing.springpractice.festtracker.models.PaymentStatus;
+import com.testing.springpractice.festtracker.models.SeatingType;
+import com.testing.springpractice.festtracker.repository.BookingRepository;
+import com.testing.springpractice.festtracker.repository.FestRepository;
+import com.testing.springpractice.festtracker.repository.SeatingRepository;
+import com.testing.springpractice.festtracker.service.MessagingService;
+import com.testing.springpractice.festtracker.service.OrganiserService;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.http.HttpStatus;
+import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -28,25 +36,28 @@ import java.util.Map;
 import java.util.UUID;
 
 @Service
-public class OrganiserService {
+public class OrganiserServiceImpl implements OrganiserService {
     private final ProjectUtils projectUtils;
     private final FestRepository festRepository;
     private final SeatingRepository seatingRepository;
     private final BookingRepository bookingRepository;
-    private final EmailService emailService;
+    private final MessagingService emailService;
     private final Cloudinary cloudinary;
 
-    public OrganiserService(ProjectUtils projectUtils, FestRepository festRepository, SeatingRepository seatingRepository, BookingRepository bookingRepository, EmailService emailService, Cloudinary cloudinary) {
+    public final KafkaTemplate<String, Object> kafka;
+
+    public OrganiserServiceImpl(ProjectUtils projectUtils, FestRepository festRepository, SeatingRepository seatingRepository, BookingRepository bookingRepository, MessagingService emailService, Cloudinary cloudinary, KafkaTemplate<String, Object> kafka) {
         this.projectUtils = projectUtils;
         this.festRepository = festRepository;
         this.seatingRepository = seatingRepository;
         this.bookingRepository = bookingRepository;
         this.emailService = emailService;
         this.cloudinary = cloudinary;
+        this.kafka = kafka;
     }
 
     @Transactional
-    public String addEvent(FestCreationRequest request, MultipartFile paymentQr) throws IOException {
+    public String addEvent(FestCreationRequest request, MultipartFile paymentQr, MultipartFile poster) throws IOException {
         Fest fest = Fest.builder()
                 .organiser(projectUtils.getCurrent())
                 .title(request.getTitle())
@@ -70,6 +81,14 @@ public class OrganiserService {
         );
         String url = upload.get("secure_url").toString();
         fest.setPaymentQrURL(url);
+        if (poster != null && !poster.isEmpty()) {
+            Map posterUpload = cloudinary.uploader().upload(
+                    poster.getBytes(),
+                    ObjectUtils.emptyMap()
+            );
+            String posterUrl = posterUpload.get("secure_url").toString();
+            fest.setPosterUrl(posterUrl);
+        }
         List<SeatingType> list = new ArrayList<>();
         for (SeatingTypeRequest i : request.getSeatingTypeRequests()){
             SeatingType seating = SeatingType.builder()
@@ -98,7 +117,7 @@ public class OrganiserService {
                 getContext().getAuthentication();
         String username = authentication.getName();
         int isAdmin = festRepository.isOwnerOfTheFest(eventId, username);
-        if (isAdmin==0) throw new RuntimeException("Invalid Access");
+        if (isAdmin==0) throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "You don't have access");
         return festRepository.entireFestDetails(eventId);
     }
 
@@ -107,7 +126,7 @@ public class OrganiserService {
                 getContext().getAuthentication();
         String username = authentication.getName();
         int isAdmin = festRepository.isOwnerOfTheFest(eventId, username);
-        if (isAdmin==0) throw new RuntimeException("Invalid Access");
+        if (isAdmin==0) throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "You don't have access");
         return seatingRepository.getSeatingDetailsByFestId(eventId);
     }
 
@@ -116,7 +135,7 @@ public class OrganiserService {
                 getContext().getAuthentication();
         String username = authentication.getName();
         int isAdmin = festRepository.isOwnerOfTheFest(eventId, username);
-        if (isAdmin==0) throw new RuntimeException("Invalid Access");
+        if (isAdmin==0) throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "You don't have access");
         Pageable number = PageRequest.of(page, size);
         return bookingRepository.getBookingDetailsByFestId(eventId, PaymentStatus.PAYMENT_SUBMITTED, number);
 
@@ -128,12 +147,12 @@ public class OrganiserService {
                 getContext().getAuthentication();
         String username = authentication.getName();
         int isAdmin = festRepository.isOwnerOfTheFest(eventId, username);
-        if (isAdmin==0) throw new RuntimeException("Invalid Access");
+        if (isAdmin==0) throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "You don't have access");
         Bookings booking = bookingRepository.findById(bookingId).orElseThrow(
-                ()->new RuntimeException("Invalid booking")
+                ()->new ResponseStatusException(HttpStatus.NOT_FOUND, "Not found")
         );
         if (!booking.getFest().getId().equals(eventId)) {
-            throw new RuntimeException("Booking does not belong to this event");
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "You don't have access");
         }
         if (booking.getPaymentStatus() == PaymentStatus.PAYMENT_REJECTED) {
             return "Booking is already declined";
@@ -145,11 +164,10 @@ public class OrganiserService {
             seating.setAvailableSeats(seating.getAvailableSeats() + booking.getSlots().intValue());
             seatingRepository.save(seating);
         }
-        emailService.sendDeclineMessage(
-                booking.getUser().getUsername(),
+        DeclineTicketMessageDTO dto = new DeclineTicketMessageDTO(booking.getUser().getUsername(),
                 booking.getUser().getName(),
-                booking.getFest().getTitle()
-        );
+                booking.getFest().getTitle());
+        kafka.send("Decline-Ticket-Service", dto.username(), dto);
         return "Ticket Declined Successfully & Seats Restored";
 
     }
@@ -160,11 +178,12 @@ public class OrganiserService {
                 getContext().getAuthentication();
         String username = authentication.getName();
         int isAdmin = festRepository.isOwnerOfTheFest(eventId, username);
-        if (isAdmin==0) throw new RuntimeException("Invalid Access");
-        Fest fest = festRepository.findById(eventId).orElseThrow(()->new RuntimeException("Invalid Event"));
+        if (isAdmin==0) throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "You don't have access");
+        Fest fest = festRepository.findById(eventId).orElseThrow(()->new ResponseStatusException(HttpStatus.NOT_FOUND, "Resource not found"));
         List<Receiver> email = festRepository.getUsernameOfUsers(eventId);
         if (email != null && !email.isEmpty()) {
-            emailService.sendFestCancellationMail(email, fest.getTitle());
+            SendFestCancellationMailDTO dto = new SendFestCancellationMailDTO(email, fest.getTitle());
+            kafka.send("Decline-Event-Service", username, dto);
         }
         fest.setActive(false);
         festRepository.save(fest);
@@ -176,9 +195,9 @@ public class OrganiserService {
                 getContext().getAuthentication();
         String username = authentication.getName();
         int isAdmin = festRepository.isOwnerOfTheFest(eventId, username);
-        if (isAdmin==0) throw new RuntimeException("Invalid Access");
+        if (isAdmin==0) throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "You don't have access");
         int rows = bookingRepository.verifyTicket(eventId, bookingKey, PaymentStatus.PAYMENT_SUBMITTED);
-        if (rows == 0) throw new RuntimeException("Invalid key or Key already checked in");
+        if (rows == 0) throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "You don't have access");
         return "Successfully verified";
 
     }

@@ -1,10 +1,9 @@
-package com.testing.springpractice.festtracker.Models;
+package com.testing.springpractice.festtracker.models;
 
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
-import org.springframework.stereotype.Indexed;
 
 import java.time.LocalDateTime;
 import java.util.UUID;

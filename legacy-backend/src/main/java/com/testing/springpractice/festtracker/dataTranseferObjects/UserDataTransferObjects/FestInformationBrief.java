@@ -1,16 +1,9 @@
-package com.testing.springpractice.festtracker.DataTranseferObjects.UserDataTransferObjects;
+package com.testing.springpractice.festtracker.dataTranseferObjects.UserDataTransferObjects;
 
-import com.testing.springpractice.festtracker.Models.SeatingType;
-import com.testing.springpractice.festtracker.Models.Users;
-import jakarta.persistence.CascadeType;
-import jakarta.persistence.Column;
-import jakarta.persistence.OneToMany;
 import lombok.*;
 
 import java.time.LocalDate;
 import java.time.LocalTime;
-import java.util.ArrayList;
-import java.util.List;
 import java.util.UUID;
 @Getter
 @Setter
@@ -30,4 +23,5 @@ public class FestInformationBrief {
     private String language;
     private String genre;
     private Boolean active;
+    private String posterUrl;
 }
